@@ -17,15 +17,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.UUID;
 
 public class BluetoothBroadcastService extends Service {
 
     private BluetoothAdapter bluetoothAdapter;
-    private static final String uuid = "05f2934c-1e81-4554-bb08-44aa761afbfb";
+    private static final String uuid = "07f2934c-1e81-4554-bb08-44aa761afbfb";
     private ConnectedThread handleThread;
     private ConnectThread connectThread;
+    private ArrayList<BluetoothDevice> deviceList;
     private String msg="";
+    private boolean found;
+    private Object lock = new Object();
 
     public BluetoothBroadcastService() {
     }
@@ -33,14 +38,27 @@ public class BluetoothBroadcastService extends Service {
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            BluetoothDevice deviceExtra = intent.getParcelableExtra("android.bluetooth.device.extra.DEVICE");
-            Parcelable[] uuidExtra = intent.getParcelableArrayExtra("android.bluetooth.device.extra.UUID");
+            //checking for non cached uuid if server uuid not chached
+            synchronized (lock) {
+                if(!found) {
+                    if (BluetoothDevice.ACTION_UUID.equals(intent.getAction())) {
+                        BluetoothDevice deviceExtra = intent.getParcelableExtra("android.bluetooth.device.extra.DEVICE");
+                        Parcelable[] uuidExtra = intent.getParcelableArrayExtra("android.bluetooth.device.extra.UUID");
+                        if (uuidExtra != null) {
+                            for (Parcelable e : uuidExtra) {
+                                if (e.toString().equals("07f2934c-1e81-4554-bb08-44aa761afbfb")) {
+                                    Log.d("REAL","Found thee uuid from sdp");
 
-            for (Parcelable e:uuidExtra){
-                Log.d("REAL", e.toString());
+                                    found = true;
+                                    connectThread = new ConnectThread(deviceExtra);
+                                    connectThread.start();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
             }
-
-            //Parse the UUIDs and get the one you are interested in
         }
     };
 
@@ -53,32 +71,32 @@ public class BluetoothBroadcastService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // start asynctask to get off this thread
+        deviceList = new ArrayList<BluetoothDevice>();
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_UUID);
+
+
         this.registerReceiver(mReceiver, filter);
         msg = intent.getStringExtra("MESSAGE");
         Log.d("HERE","GOT MESSAGE FROM RECEIVER: "+msg);
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        bluetoothAdapter.startDiscovery();
         BluetoothDevice glass = null;
-        boolean found = false;
+        found = false;
+
+        //check for cached uuid (Faster)
 
         for(BluetoothDevice b:bluetoothAdapter.getBondedDevices()) {
-            b.fetchUuidsWithSdp();
             ParcelUuid[] uuids = b.getUuids();
 
             Log.d("UUID",b.getName().toString());
             for (ParcelUuid p : uuids) {
                 Log.d("UUID",p.getUuid().toString());
-                if (p.getUuid().toString().equals("05f2934c-1e81-4554-bb08-44aa761afbfb")) {
-
+                if (p.getUuid().toString().equals("07f2934c-1e81-4554-bb08-44aa761afbfb")) {
+                    glass = b;
+                    found = true;
+                    break;
                 }
             }
-            if(b.getName().equals("The Lizzy's Glass")){
-                glass = b;
-                found = true;
-            }
-
             if(found)
                 break;
         }
@@ -87,6 +105,10 @@ public class BluetoothBroadcastService extends Service {
             Log.d("PAIR", "PAIRED WITH: " + glass.getName());
             connectThread = new ConnectThread(glass);
             connectThread.start();
+        } else {
+            for(BluetoothDevice b:bluetoothAdapter.getBondedDevices()){
+                b.fetchUuidsWithSdp();
+            }
         }
 
 
