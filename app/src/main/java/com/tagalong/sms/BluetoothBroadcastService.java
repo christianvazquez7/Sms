@@ -48,7 +48,6 @@ public class BluetoothBroadcastService extends Service {
                             for (Parcelable e : uuidExtra) {
                                 if (e.toString().equals("07f2934c-1e81-4554-bb08-44aa761afbfb")) {
                                     Log.d("REAL","Found thee uuid from sdp");
-
                                     found = true;
                                     connectThread = new ConnectThread(deviceExtra);
                                     connectThread.start();
@@ -71,48 +70,52 @@ public class BluetoothBroadcastService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // start asynctask to get off this thread
-        deviceList = new ArrayList<BluetoothDevice>();
-        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_UUID);
+        if(intent != null) {
+            deviceList = new ArrayList<BluetoothDevice>();
+            IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_UUID);
 
 
-        this.registerReceiver(mReceiver, filter);
-        msg = intent.getStringExtra("MESSAGE");
-        Log.d("HERE","GOT MESSAGE FROM RECEIVER: "+msg);
+            this.registerReceiver(mReceiver, filter);
+            msg = intent.getStringExtra("MESSAGE");
+            Log.d("HERE", "GOT MESSAGE FROM RECEIVER: " + msg);
 
-        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        BluetoothDevice glass = null;
-        found = false;
+            bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+            BluetoothDevice glass = null;
+            found = false;
 
-        //check for cached uuid (Faster)
+            //check for cached uuid (Faster)
 
-        for(BluetoothDevice b:bluetoothAdapter.getBondedDevices()) {
-            ParcelUuid[] uuids = b.getUuids();
+            for (BluetoothDevice b : bluetoothAdapter.getBondedDevices()) {
+                ParcelUuid[] uuids = b.getUuids();
 
-            Log.d("UUID",b.getName().toString());
-            for (ParcelUuid p : uuids) {
-                Log.d("UUID",p.getUuid().toString());
-                if (p.getUuid().toString().equals("07f2934c-1e81-4554-bb08-44aa761afbfb")) {
-                    glass = b;
-                    found = true;
+                Log.d("UUID", b.getName().toString());
+                for (ParcelUuid p : uuids) {
+                    Log.d("UUID", p.getUuid().toString());
+                    if (p.getUuid().toString().equals("07f2934c-1e81-4554-bb08-44aa761afbfb")) {
+                        glass = b;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found)
                     break;
+            }
+
+            if (found) {
+                Log.d("PAIR", "PAIRED WITH: " + glass.getName());
+                connectThread = new ConnectThread(glass);
+                connectThread.start();
+            } else {
+                for (BluetoothDevice b : bluetoothAdapter.getBondedDevices()) {
+                    b.fetchUuidsWithSdp();
                 }
             }
-            if(found)
-                break;
-        }
 
-        if(found) {
-            Log.d("PAIR", "PAIRED WITH: " + glass.getName());
-            connectThread = new ConnectThread(glass);
-            connectThread.start();
+
+            return Service.START_STICKY;
         } else {
-            for(BluetoothDevice b:bluetoothAdapter.getBondedDevices()){
-                b.fetchUuidsWithSdp();
-            }
+            return Service.START_NOT_STICKY;
         }
-
-
-        return Service.START_STICKY;
     }
 
     private class ConnectThread extends Thread {
