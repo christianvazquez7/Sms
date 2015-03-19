@@ -21,8 +21,17 @@ import android.widget.TextView;
 
 import com.koushikdutta.async.future.FutureCallback;
 import com.koushikdutta.ion.Ion;
+import com.parse.Parse;
+import com.parse.ParseInstallation;
+import com.parse.ParsePush;
+import com.parse.PushService;
+import com.parse.SaveCallback;
+
 
 import org.w3c.dom.Text;
+
+import java.text.ParseException;
+import java.util.List;
 
 
 public class MainActivity extends Activity {
@@ -35,12 +44,14 @@ public class MainActivity extends Activity {
     private TextView status;
     private ProgressBar progressBar;
     private TelephonyManager telephoneManager;
+    private String connectedTo="";
 
     private static final String address = "http://tagalong.ddns.net/";
     private static final String registerAction = "requestPair/";
     private static final String checkStatus = "requestStatus/";
     private static final String unregister = "unregister/";
     private String myNumber;
+    private View messageButton;
 
     private Handler statusHandler;
 
@@ -66,6 +77,7 @@ public class MainActivity extends Activity {
         fetchStatus();
         Intent bluetoothServiceIntent = new Intent(this,BluetoothBroadcastService.class);
         bluetoothServiceIntent.putExtra("MESSAGE","+"+myNumber);
+        bluetoothServiceIntent.putExtra("register",true);
         this.startService(bluetoothServiceIntent);
     }
 
@@ -89,6 +101,19 @@ public class MainActivity extends Activity {
                                 status.setText("Disconnected");
                                 progressBar.setVisibility(View.GONE);
 
+                                List<String> subscribedChannels = ParseInstallation.getCurrentInstallation().getList("channels");
+                                if(subscribedChannels != null) {
+                                    Log.d("UNSUB","unsubscribing");
+
+                                    for (String channel : subscribedChannels) {
+                                        ParsePush.unsubscribeInBackground(channel);
+                                    }
+                                }
+                                registerButton.setText("Register");
+                                registerButton.setBackgroundColor(getResources().getColor(R.color.green));
+                                connectedTo = "";
+
+
                             }
                             else if (result.equals("pairing")){
                                 registered = false;
@@ -98,9 +123,14 @@ public class MainActivity extends Activity {
                                 status.setText("Awaiting companion confirmation");
                                 progressBar.setVisibility(View.VISIBLE);
                                 statusHandler.postDelayed(pollThread,2000);
+                                registerButton.setText("Register");
+                                registerButton.setBackgroundColor(getResources().getColor(R.color.green));
 
                             } else {
                                 registered = true;
+                                Log.d("CHANNEL","Subscribing to "+result);
+                                connectedTo = "wearer_"+result;
+                                ParsePush.subscribeInBackground("wearer_"+myNumber);
                                 disconnected = false;
                                 pairing = false;
                                 progressBar.setVisibility(View.GONE);
@@ -120,6 +150,9 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        //Parse.initialize(this, "gtpR5QrRLjQE4NMnBM3oWJ69TY3hNnbiNbQz90Xd", "NHh3oaQZHKaHhY1Fqq3sCedy6dd82JD1DRZYW6rO");
+
+
         statusHandler = new Handler();
 
         //fetching phone number
@@ -131,9 +164,11 @@ public class MainActivity extends Activity {
         Log.d("MY NUMBBER",myNumber);
         myNumber = myNumber.substring(1);
 
-        Intent bluetoothServiceIntent = new Intent(this,BluetoothBroadcastService.class);
-        bluetoothServiceIntent.putExtra("MESSAGE","+"+myNumber);
-        this.startService(bluetoothServiceIntent);
+//        Intent bluetoothServiceIntent = new Intent(this,BluetoothBroadcastService.class);
+//        bluetoothServiceIntent.putExtra("MESSAGE","+"+myNumber);
+//        bluetoothServiceIntent.putExtra("register",true);
+//        this.startService(bluetoothServiceIntent);
+
 
         //fetching components of ui
 
@@ -142,6 +177,8 @@ public class MainActivity extends Activity {
         message = (EditText) this.findViewById(R.id.message);
         status = (TextView) this.findViewById(R.id.status);
         progressBar = (ProgressBar) this.findViewById(R.id.progressBar);
+        messageButton = this.findViewById(R.id.message_companion);
+
 
         status.setText("");
         fetchStatus();
@@ -155,10 +192,11 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 if (!registered) {
+                    ParsePush.subscribeInBackground("wearer_"+myNumber);
 
-                    Intent bluetoothServiceIntent = new Intent(MainActivity.this,BluetoothBroadcastService.class);
-                    bluetoothServiceIntent.putExtra("MESSAGE","+"+myNumber);
-                    MainActivity.this.startService(bluetoothServiceIntent);
+//                    Intent bluetoothServiceIntent = new Intent(MainActivity.this,BluetoothBroadcastService.class);
+//                    bluetoothServiceIntent.putExtra("MESSAGE","+"+myNumber);
+//                    MainActivity.this.startService(bluetoothServiceIntent);
 
                     if (!companionPhone.getText().equals("")) {
                         progressBar.setVisibility(View.VISIBLE);
@@ -209,11 +247,17 @@ public class MainActivity extends Activity {
                                       disconnected = true;
                                       pairing = false;
                                       registered = false;
-
                                         registerButton.setText("Register");
                                         registerButton.setBackgroundColor(getResources().getColor(R.color.green));
                                         status.setTextColor(getResources().getColor(R.color.red));
                                         status.setText("Disconnected");
+                                        List<String> subscribedChannels = ParseInstallation.getCurrentInstallation().getList("channels");
+                                        Log.d("UNSUB","unsubscribing");
+                                        for(String channel : subscribedChannels) {
+                                            ParsePush.unsubscribeInBackground(channel);
+                                        }
+                                        connectedTo = "";
+
 
                                     }
                                 }
@@ -230,6 +274,15 @@ public class MainActivity extends Activity {
             public void onClick(View v) {
                 Intent intent = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
                 startActivityForResult(intent, PICK_CONTACT);
+            }
+        });
+
+        messageButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent toMessage = new Intent();
+                toMessage.setClass(MainActivity.this,WearerActivity.class);
+                startActivity(toMessage);
             }
         });
     }

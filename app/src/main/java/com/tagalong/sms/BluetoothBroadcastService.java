@@ -19,6 +19,7 @@ import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
 
 public class BluetoothBroadcastService extends Service {
@@ -31,6 +32,7 @@ public class BluetoothBroadcastService extends Service {
     private String msg="";
     private boolean found;
     private Object lock = new Object();
+    private boolean isRegistration = false;
 
     public BluetoothBroadcastService() {
     }
@@ -49,17 +51,29 @@ public class BluetoothBroadcastService extends Service {
                                 if (e.toString().equals("07f2934c-1e81-4554-bb08-44aa761afbfb")) {
                                     Log.d("REAL","Found thee uuid from sdp");
                                     found = true;
-                                    connectThread = new ConnectThread(deviceExtra);
+                                    connectThread = new ConnectThread(deviceExtra,isRegistration);
                                     connectThread.start();
                                     break;
                                 }
                             }
+
+                            if(!found){
+                                Log.d("HARDER","TRYING HARDER");
+                                tryHarder();
+                            }
+
                         }
                     }
                 }
             }
         }
     };
+
+    private void tryHarder(){
+        for (BluetoothDevice b : bluetoothAdapter.getBondedDevices()){
+            connectThread = new ConnectThread(b,isRegistration);
+        }
+    }
 
 
     @Override
@@ -77,6 +91,7 @@ public class BluetoothBroadcastService extends Service {
 
             this.registerReceiver(mReceiver, filter);
             msg = intent.getStringExtra("MESSAGE");
+            isRegistration = intent.getBooleanExtra("register",false);
             Log.d("HERE", "GOT MESSAGE FROM RECEIVER: " + msg);
 
             bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -88,13 +103,16 @@ public class BluetoothBroadcastService extends Service {
             for (BluetoothDevice b : bluetoothAdapter.getBondedDevices()) {
                 ParcelUuid[] uuids = b.getUuids();
 
-                Log.d("UUID", b.getName().toString());
-                for (ParcelUuid p : uuids) {
-                    Log.d("UUID", p.getUuid().toString());
-                    if (p.getUuid().toString().equals("07f2934c-1e81-4554-bb08-44aa761afbfb")) {
-                        glass = b;
-                        found = true;
-                        break;
+                Log.d("DEVICE", b.getName());
+
+                if(uuids != null) {
+                    for (ParcelUuid p : uuids) {
+                        Log.d("UUID", p.getUuid().toString());
+                        if (p.getUuid().toString().equals("07f2934c-1e81-4554-bb08-44aa761afbfb")) {
+                            glass = b;
+                            found = true;
+                            break;
+                        }
                     }
                 }
                 if (found)
@@ -103,7 +121,7 @@ public class BluetoothBroadcastService extends Service {
 
             if (found) {
                 Log.d("PAIR", "PAIRED WITH: " + glass.getName());
-                connectThread = new ConnectThread(glass);
+                connectThread = new ConnectThread(glass,isRegistration);
                 connectThread.start();
             } else {
                 for (BluetoothDevice b : bluetoothAdapter.getBondedDevices()) {
@@ -122,9 +140,11 @@ public class BluetoothBroadcastService extends Service {
         private final BluetoothSocket mmSocket;
         private final BluetoothDevice mmDevice;
         private static final String TAG = "CONNECTTHREAD";
+        private boolean register;
 
-        public ConnectThread(BluetoothDevice device) {
+        public ConnectThread(BluetoothDevice device,boolean register) {
             Log.e(TAG, "ConnectThread start....");
+            this.register = register;
             BluetoothSocket tmp = null;
             mmDevice = device;
             try {
@@ -139,26 +159,38 @@ public class BluetoothBroadcastService extends Service {
         public void run() {
             bluetoothAdapter.cancelDiscovery();
             Log.e(TAG,"stopping discovery");
-            try {
-                Log.e(TAG,"connecting!");
-                mmSocket.connect();
-            } catch (IOException connectException) {
-
-                connectException.printStackTrace();
-
-                Log.e(TAG,"failed to connect");
+            boolean retry = register;
 
                 try {
-                    Log.e(TAG,"close-ah-da-socket");
-                    mmSocket.close();
-                } catch (IOException closeException) {
-                    Log.e(TAG,"failed to close hte socket");
+                    Log.e(TAG, "connecting!");
+                    mmSocket.connect();
+                    retry = false;
+                } catch (IOException connectException) {
 
+                    connectException.printStackTrace();
+
+                    Log.e(TAG, "failed to connect");
+
+                    try {
+                        Log.e(TAG, "close-ah-da-socket");
+                        mmSocket.close();
+                    } catch (IOException closeException) {
+                        Log.e(TAG, "failed to close hte socket");
+                    }
+                    Log.e(TAG, "returning..");
+                    if(!retry)
+                        return;
+                    else {
+                        try{
+                            Thread.sleep(1500);
+                            connectThread = new ConnectThread(mmDevice,isRegistration);
+                            connectThread.start();
+                        } catch (InterruptedException e){
+
+                        }
+                    }
                 }
-                Log.e(TAG,"returning..");
 
-                return;
-            }
 
             Log.e(TAG,"we can now manage our connection!");
             // Do work to manage the connection (in a separate thread)
