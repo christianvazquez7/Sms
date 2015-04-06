@@ -37,7 +37,7 @@ public class SmsReciever extends BroadcastReceiver {
 
         // Retrieves a map of extended data from the intent.
             final Bundle bundle = intent.getExtras();
-            if(intent.getAction().equals("com.tagalong.sms.GET_CARD")){
+            if(intent.getAction().equals("com.tagalong.sms.GET_CARD") || intent.getAction().equals("com.tagalong.sms.STATUS")){
                 try {
                     JSONObject json = new JSONObject(intent.getExtras().getString("com.parse.Data"));
                     String notificationText = json.getString("alert");

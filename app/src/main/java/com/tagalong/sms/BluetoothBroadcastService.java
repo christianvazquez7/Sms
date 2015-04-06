@@ -33,6 +33,8 @@ public class BluetoothBroadcastService extends Service {
     private boolean found;
     private Object lock = new Object();
     private boolean isRegistration = false;
+    private boolean tryHarder = true;
+    private boolean tryingHarder = false;
 
     public BluetoothBroadcastService() {
     }
@@ -59,7 +61,12 @@ public class BluetoothBroadcastService extends Service {
 
                             if(!found){
                                 Log.d("HARDER","TRYING HARDER");
-                                tryHarder();
+                                    if (tryHarder) {
+                                        tryHarder();
+                                        tryHarder = false;
+                                        tryingHarder = true;
+                                    }
+
                             }
 
                         }
@@ -71,7 +78,11 @@ public class BluetoothBroadcastService extends Service {
 
     private void tryHarder(){
         for (BluetoothDevice b : bluetoothAdapter.getBondedDevices()){
-            connectThread = new ConnectThread(b,isRegistration);
+            if(b.getName().toLowerCase().contains("glass")) {
+                connectThread = new ConnectThread(b, isRegistration);
+                connectThread.start();
+                break;
+            }
         }
     }
 
@@ -128,8 +139,6 @@ public class BluetoothBroadcastService extends Service {
                     b.fetchUuidsWithSdp();
                 }
             }
-
-
             return Service.START_STICKY;
         } else {
             return Service.START_NOT_STICKY;
@@ -162,7 +171,7 @@ public class BluetoothBroadcastService extends Service {
             boolean retry = register;
 
                 try {
-                    Log.e(TAG, "connecting!");
+                    Log.e(TAG, "connecting to : "+mmDevice.getName());
                     mmSocket.connect();
                     retry = false;
                 } catch (IOException connectException) {
@@ -178,7 +187,7 @@ public class BluetoothBroadcastService extends Service {
                         Log.e(TAG, "failed to close hte socket");
                     }
                     Log.e(TAG, "returning..");
-                    if(!retry)
+                    if(!retry || tryingHarder)
                         return;
                     else {
                         try{

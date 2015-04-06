@@ -40,6 +40,8 @@
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
                 <action android:name="com.tagalong.sms.GET_CARD" />
                 <action android:name="com.tagalong.sms.WEARER_IMAGE" />
+                <action android:name="com.tagalong.sms.STATUS" />
+
             </intent-filter>
         </receiver>
 

@@ -159,9 +159,15 @@ public class MainActivity extends Activity {
 
         telephoneManager = (TelephonyManager) this.getSystemService(Context.TELEPHONY_SERVICE);
         myNumber = telephoneManager.getLine1Number();
-        if(myNumber.equals("+15126389698"))
+        if(myNumber == null){
+            myNumber = ""+System.currentTimeMillis();
+        }
+
+        if(myNumber.equals("+15126389698")) //my sim doesn't have my number
             myNumber = "+17876131066";
         Log.d("MY NUMBBER",myNumber);
+
+        //TODO: Make sure my number starts with +
         myNumber = myNumber.substring(1);
 
 //        Intent bluetoothServiceIntent = new Intent(this,BluetoothBroadcastService.class);
@@ -281,6 +287,7 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 Intent toMessage = new Intent();
+                toMessage.putExtra("phone",myNumber);
                 toMessage.setClass(MainActivity.this,WearerActivity.class);
                 startActivity(toMessage);
             }
