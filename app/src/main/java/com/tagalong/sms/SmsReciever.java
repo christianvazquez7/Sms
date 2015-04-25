@@ -58,6 +58,7 @@ public class SmsReciever extends BroadcastReceiver {
                     Intent customIntent = new Intent();
                     customIntent.setAction("com.tagalong.sms.ADD_IMAGE");
                     customIntent.putExtra("timestamp",splitMessage[splitMessage.length - 1]);
+                    customIntent.putExtra("sender",splitMessage[splitMessage.length - 2]);
                     context.sendBroadcast(customIntent);
                 } catch (JSONException e) {
                     Log.d("SMSRECIEVER", "JSONException: " + e.getMessage());

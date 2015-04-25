@@ -137,6 +137,11 @@ public class BluetoothBroadcastService extends Service {
             } else {
                 for (BluetoothDevice b : bluetoothAdapter.getBondedDevices()) {
                     b.fetchUuidsWithSdp();
+//                    if(b.getName().equalsIgnoreCase("Christian D Vazquez Machado's Glass")){
+//                        found = true;
+//                        connectThread = new ConnectThread(b,isRegistration);
+//                        connectThread.start();
+//                    }
                 }
             }
             return Service.START_STICKY;

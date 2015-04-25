@@ -94,7 +94,19 @@
             android:name=".WearerActivity"
             android:label="@string/title_activity_wearer"
             android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
             >
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http"
+                    android:host="tagalong.ddns.net"
+                    android:pathPrefix="/companion" />
+            </intent-filter>
+
+
         </activity>
     </application>
 

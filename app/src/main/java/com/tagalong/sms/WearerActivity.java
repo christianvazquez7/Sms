@@ -12,9 +12,12 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.WindowManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+
+import com.parse.ParsePush;
 
 
 public class WearerActivity extends Activity {
@@ -24,11 +27,12 @@ public class WearerActivity extends Activity {
         @Override
         public void onReceive(Context context, Intent intent) {
             final String timestamp = intent.getStringExtra("timestamp");
+            final String senderPhone = intent.getStringExtra("sender"); //change
             Log.d("HERE",timestamp);
             webInterface.post(new Runnable() {
                 @Override
                 public void run() {
-                    webInterface.loadUrl("javascript:sendMessage("+timestamp+",\'"+myNumber+"\');");
+                    webInterface.loadUrl("javascript:sendMessage("+timestamp+",\'"+senderPhone+"\');");
                 }
             });
         }
@@ -36,13 +40,40 @@ public class WearerActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_wearer);
         webInterface = (WebView) findViewById(R.id.webInterface);
         WebSettings webSettings = webInterface.getSettings();
         webSettings.setJavaScriptEnabled(true);
-        webInterface.loadUrl("http://tagalong.ddns.net/wearer");
-        myNumber = getIntent().getStringExtra("phone");
         webInterface.setWebChromeClient(new WebChromeClient());
+        WebSettings settings = webInterface.getSettings();
+        settings.setDomStorageEnabled(true);
+
+        final Intent intent = getIntent();
+        final String action = intent.getAction();
+        ParsePush.subscribeInBackground("companion");
+
+
+        if (Intent.ACTION_VIEW.equals(action)) {
+            String url = intent.getDataString();
+            webInterface.loadUrl(url);
+            String[] params = url.split("_");
+            myNumber = params[params.length-1];
+            Log.d("HERE",url);
+            Log.d("HERE",myNumber);
+            Intent customIntent = new Intent();
+            customIntent.setAction("com.tagalong.sms.ADD_IMAGE");
+
+            String[] params2 = params[1].split("=");
+            customIntent.putExtra("timestamp",params2[params2.length-1]);
+            Log.d("HERE",params2[params2.length-1]);
+            this.sendBroadcast(customIntent);
+
+        } else {
+            webInterface.loadUrl("http://tagalong.ddns.net/wearer");
+            myNumber = getIntent().getStringExtra("phone");
+        }
+
     }
 
 
@@ -57,11 +88,14 @@ public class WearerActivity extends Activity {
     public void onPause(){
         super.onPause();
         this.unregisterReceiver(mReceiver);
+        ParsePush.unsubscribeInBackground("companion");
+
     }
 
     @Override
     public void onResume(){
         super.onResume();
+        ParsePush.subscribeInBackground("companion");
         IntentFilter filter = new IntentFilter("com.tagalong.sms.ADD_IMAGE");
         this.registerReceiver(mReceiver, filter);
     }
